@@ -26,6 +26,7 @@ public class Board : MonoBehaviour
     Row[] rows;
     string[] solutions;
     HashSet<string> validGuesses;
+    List<string> possibleSolutions;
 
     string solution;
     Row currentRow;
@@ -75,6 +76,7 @@ public class Board : MonoBehaviour
         SetRandomWord();
         ResetBoard();
         alphabet.ResetStates(emptyState);
+        possibleSolutions = new List<string>(solutions);
     }
 
 
@@ -133,7 +135,8 @@ public class Board : MonoBehaviour
         {
             if (submitAction.triggered)
             {
-                CheckGuess();
+                SpecialCheck();
+                // CheckGuess();
             }
         }
 
@@ -204,6 +207,133 @@ public class Board : MonoBehaviour
         }
     }
 
+    void SpecialCheck()
+    {
+        string guess = currentRow.GetWord();
+        
+        if (!validGuesses.Contains(guess))
+        {
+            invalidWordText.SetActive(true);
+            return;
+        }
+        
+        // treat the guess as a solution
+        // find the matching states for every word in possibleSolutions
+        // add the matching states to a Dictionary with a count of how many times they appear
+        Dictionary<string, int> matchCodeFreq =  new Dictionary<string, int>();
+        Dictionary<string, List<string>> matchCodes = new Dictionary<string, List<string>>();
+
+        foreach (string possibleSolution in possibleSolutions)
+        {
+            string matchCode = ComputeMatchCodes(guess, possibleSolution);
+            Debug.Log("matchCode: " + matchCode);
+            if (matchCodeFreq.ContainsKey(matchCode))
+            {
+                matchCodeFreq[matchCode]++;
+                matchCodes[matchCode].Add(possibleSolution);
+            }
+            else
+            {
+                matchCodeFreq[matchCode] = 1;
+                matchCodes.Add(matchCode, new List<string> { possibleSolution });
+            }
+        }
+        
+        // TODO: handle ties to choose the wrong answer
+        
+        // pick the one that appears the most
+        string mostFreqMatch = matchCodeFreq.OrderByDescending(x => x.Value).First().Key;
+        Debug.Log("most freq: " + mostFreqMatch);
+        possibleSolutions = matchCodes[mostFreqMatch];
+
+        for (int i = 0; i < mostFreqMatch.Length; i++)
+        {
+            // update the tiles and alphabet tiles
+            char code =  mostFreqMatch[i];
+            Tile tile = currentRow.tiles[i];
+            if (code == 'C')
+            {
+                tile.SetState(correctState);
+                alphabet.SetState(tile.letter, correctState);
+            } else if (code == 'X')
+            {
+                tile.SetState(letterNotInSolutionState);
+                alphabet.SetState(tile.letter, letterNotInSolutionState);
+            } else if (code == 'W')
+            {
+                tile.SetState(wrongSpotState);
+                alphabet.SetState(tile.letter, wrongSpotState);
+            }
+            else
+            {
+                tile.SetState(incorrectState);
+            }
+            
+        }
+        
+        // if all correct, then game over
+        if (mostFreqMatch == "CCCCC")
+        {
+            DisableBoard(true);
+            return;
+        }
+        
+        if (!NextRow())
+        {
+            DisableBoard(false);
+        }
+    }
+
+    string ComputeMatchCodes(string guess, string solution)
+    {
+        char[] matchCodes = "EEEEE".ToCharArray(); 
+        
+        // first check correct tiles and letters that are not in the solution
+        char[] remainingChars = solution.ToCharArray();
+        for (int i = 0; i < solution.Length; i++)
+        {
+            char letter = guess[i];
+            if (solution[i] == letter)
+            {
+                matchCodes[i] = 'C';
+                remainingChars[i] = ' ';
+            }
+            else if (!solution.Contains(letter))
+            {
+                matchCodes[i] = 'X';
+            }
+        }
+        
+        if (guess == solution)
+        {
+            return new string(matchCodes);
+        }
+
+        // handle letters in the wrong spot, correctly indicating multiple occurrences
+        for (int i = 0; i < solution.Length; i++)
+        {
+            if (matchCodes[i] == 'C' || matchCodes[i] == 'X')
+            { // already handled these in previous loop
+                continue;
+            }
+
+            int index = Array.IndexOf(remainingChars, guess[i]);
+            if (index >= 0) // letter is in remaining, so remove it
+            {
+                matchCodes[i] = 'W';
+                remainingChars[index] = ' ';
+            }
+            else // letter appears more times in guess than solution
+            {
+                matchCodes[i] = 'I';
+            }
+        }
+        
+        return new string(matchCodes);
+    }
+    
+    
+    
     
     // Returns true if successfully moved to next Row; false if there are no more rows.
     bool NextRow()
