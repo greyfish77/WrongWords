@@ -27,6 +27,12 @@ public class Tile : MonoBehaviour
         text = GetComponentInChildren<TextMeshProUGUI>();
         fill = GetComponent<Image>();
         outline = GetComponent<Outline>();
+        
+        string letterText = text.text;
+        if (letterText.Length > 0)
+        {
+            SetLetter(letterText[0]);
+        }
     }
 
     

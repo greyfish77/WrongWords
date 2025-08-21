@@ -22,6 +22,7 @@ public class Board : MonoBehaviour
     public GameObject newWordButton;
     public GameObject invalidWordText;
 
+    Alphabet alphabet;
     Row[] rows;
     string[] solutions;
     HashSet<string> validGuesses;
@@ -37,6 +38,7 @@ public class Board : MonoBehaviour
     void Awake()
     {
         rows = GetComponentsInChildren<Row>();
+        alphabet = GetComponentInChildren<Alphabet>();
     }
 
 
@@ -59,7 +61,7 @@ public class Board : MonoBehaviour
         TextAsset textFile = Resources.Load("enable") as TextAsset;
         string[] allGuesses = textFile.text.Split(SEPARATOR, StringSplitOptions.None);
         validGuesses = new HashSet<string>(allGuesses.Where(g => g.Length == 5));
-
+        
         textFile = Resources.Load("5000-more-common") as TextAsset;
         string[] allSolutions = textFile.text.Split(SEPARATOR, StringSplitOptions.None);
         solutions = allSolutions.Where(s => s.Length == 5).ToArray();
@@ -72,6 +74,7 @@ public class Board : MonoBehaviour
     {
         SetRandomWord();
         ResetBoard();
+        alphabet.ResetStates(emptyState);
     }
 
 
@@ -155,10 +158,12 @@ public class Board : MonoBehaviour
             {
                 tile.SetState(correctState);
                 remainingChars[i] = ' ';
+                alphabet.SetState(tile.letter, correctState);
             }
             else if (!solution.Contains(tile.letter))
             {
                 tile.SetState(letterNotInSolutionState);
+                alphabet.SetState(tile.letter, letterNotInSolutionState);
             }
         }
         
@@ -181,6 +186,11 @@ public class Board : MonoBehaviour
             {
                 tile.SetState(wrongSpotState);
                 remainingChars[index] = ' ';
+                Tile.State alphaState = alphabet.GetState(tile.letter);
+                if (alphaState != correctState && alphaState != letterNotInSolutionState)
+                {
+                    alphabet.SetState(tile.letter, wrongSpotState);
+                }
             }
             else // letter appears more times in guess than solution
             {
