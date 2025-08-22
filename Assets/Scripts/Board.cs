@@ -63,7 +63,8 @@ public class Board : MonoBehaviour
         string[] allGuesses = textFile.text.Split(SEPARATOR, StringSplitOptions.None);
         validGuesses = new HashSet<string>(allGuesses.Where(g => g.Length == 5));
         
-        textFile = Resources.Load("5000-more-common") as TextAsset;
+        textFile = Resources.Load("enable") as TextAsset;
+        // textFile = Resources.Load("5000-more-common") as TextAsset;
         string[] allSolutions = textFile.text.Split(SEPARATOR, StringSplitOptions.None);
         solutions = allSolutions.Where(s => s.Length == 5).ToArray();
         
@@ -136,76 +137,11 @@ public class Board : MonoBehaviour
             if (submitAction.triggered)
             {
                 SpecialCheck();
-                // CheckGuess();
             }
         }
 
     }
-
-    void CheckGuess()
-    {
-        string guess = currentRow.GetWord();
-        
-        if (!validGuesses.Contains(guess))
-        {
-            invalidWordText.SetActive(true);
-            return;
-        }
-        
-        // first check correct tiles and letters that are not in the solution
-        char[] remainingChars = solution.ToCharArray();
-        for (int i = 0; i < solution.Length; i++)
-        {
-            Tile tile = currentRow.tiles[i];
-            if (solution[i] == tile.letter)
-            {
-                tile.SetState(correctState);
-                remainingChars[i] = ' ';
-                alphabet.SetState(tile.letter, correctState);
-            }
-            else if (!solution.Contains(tile.letter))
-            {
-                tile.SetState(letterNotInSolutionState);
-                alphabet.SetState(tile.letter, letterNotInSolutionState);
-            }
-        }
-        
-        if (guess == solution)
-        {
-            DisableBoard(true);
-            return;
-        }
-
-        // handle letters in the wrong spot, correctly indicating multiple occurrences
-        foreach (var tile in currentRow.tiles)
-        {
-            if (tile.state == correctState || tile.state == letterNotInSolutionState)
-            { // already handled these in previous loop
-                continue;
-            }
-
-            int index = Array.IndexOf(remainingChars, tile.letter);
-            if (index >= 0) // letter is in remaining, so remove it
-            {
-                tile.SetState(wrongSpotState);
-                remainingChars[index] = ' ';
-                Tile.State alphaState = alphabet.GetState(tile.letter);
-                if (alphaState != correctState && alphaState != letterNotInSolutionState)
-                {
-                    alphabet.SetState(tile.letter, wrongSpotState);
-                }
-            }
-            else // letter appears more times in guess than solution
-            {
-                tile.SetState(incorrectState);
-            }
-        }
-        
-        if (!NextRow())
-        {
-            DisableBoard(false);
-        }
-    }
+    
 
     void SpecialCheck()
     {
@@ -226,7 +162,7 @@ public class Board : MonoBehaviour
         foreach (string possibleSolution in possibleSolutions)
         {
             string matchCode = ComputeMatchCodes(guess, possibleSolution);
-            Debug.Log("matchCode: " + matchCode);
+            // Debug.Log("matchCode: " + matchCode);
             if (matchCodeFreq.ContainsKey(matchCode))
             {
                 matchCodeFreq[matchCode]++;
@@ -242,7 +178,24 @@ public class Board : MonoBehaviour
         // TODO: handle ties to choose the wrong answer
         
         // pick the one that appears the most
-        string mostFreqMatch = matchCodeFreq.OrderByDescending(x => x.Value).First().Key;
+        int maxFreq = matchCodeFreq.Values.Max();
+        Debug.Log("max freq: " + maxFreq);
+        List<string> mostFreqMatchCodes = matchCodeFreq.Where(e => e.Value == maxFreq).Select(e => e.Key).ToList();
+        Debug.Log("number of max: " + mostFreqMatchCodes.Count);
+        string mostFreqMatch =  mostFreqMatchCodes.First();
+        int minScore = ScoreTheMatchCode(mostFreqMatch);
+        foreach (string matchCode in mostFreqMatchCodes)
+        {
+            int score = ScoreTheMatchCode(matchCode);
+            Debug.Log("code and score: " + matchCode + " : " + score);
+            if (score < minScore)
+            {
+                minScore = score;
+                mostFreqMatch =  matchCode;
+            }
+        }
+        
+        // string mostFreqMatch = matchCodeFreq.OrderByDescending(x => x.Value).First().Key;
         Debug.Log("most freq: " + mostFreqMatch);
         possibleSolutions = matchCodes[mostFreqMatch];
 
@@ -331,8 +284,23 @@ public class Board : MonoBehaviour
         
         return new string(matchCodes);
     }
-    
-    
+
+    int ScoreTheMatchCode(string matchCode)
+    {
+        int score = 0;
+        foreach (char letter in matchCode)
+        {
+            if (letter == 'C')
+            {
+                score += 2;
+            } else if (letter == 'W')
+            {
+                score += 1;
+            }
+        }
+        
+        return score;
+    }
     
     
     // Returns true if successfully moved to next Row; false if there are no more rows.
